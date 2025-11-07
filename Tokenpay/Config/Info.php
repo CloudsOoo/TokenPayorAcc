@@ -4,7 +4,7 @@ declare (strict_types=1);
 return [
     'version' => '1.0.0',
     'name' => 'TokenPay',
-    'author' => 'ai_dianpu',
+    'author' => 'Conan',
     'website' => '#',
     'description' => 'TokenPay',
     'options' => [
