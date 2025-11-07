@@ -10,7 +10,7 @@ use Kernel\Exception\JSONException;
 
 /**
  * Class Pay
- * @package App\Pay\Kvmpay\Impl
+ * @package App\Pay\Tokenpay\Impl
  */
 class Pay extends Base implements \App\Pay\Pay
 {
@@ -34,33 +34,36 @@ class Pay extends Base implements \App\Pay\Pay
             throw new JSONException("请配置货币类型");
         }
 
-	$param = [
-	    'OutOrderId' => $this->tradeNo, //外部订单号
-        'OrderUserKey' => $this->tradeNo,
-	    'ActualAmount' => $this->amount,   //订单实际支付的人民币金额，保留两位小数
-	    'Currency' => $this->config['typename'],   //加密货币的币种，直接以原样字符串传递即可
-	    'NotifyUrl' => $this->callbackUrl,  //异步通知URL
-	    'RedirectUrl' => $this->returnUrl,    //订单支付或过期后跳转的URL
-            'Timestamp'    => time(), // 增加时间戳参数
-	];
+        // 构建订单参数
+        $param = [
+            'OutOrderId' => $this->tradeNo, // 外部订单号
+            'OrderUserKey' => $this->tradeNo, // 支付用户标识
+            'ActualAmount' => number_format((float)$this->amount, 2, '.', ''), // 保留两位小数
+            'Currency' => $this->config['typename'], // 加密货币币种
+            'NotifyUrl' => $this->callbackUrl, // 异步通知URL
+            'RedirectUrl' => $this->returnUrl, // 跳转URL
+        ];
         
-        $param['signature'] = Signature::generateSignature($param, $this->config['key']);
+        // 生成签名
+        $param['Signature'] = Signature::generateSignature($param, $this->config['key']);
 
         try {
             $request = $this->http()->post(trim($this->config['url'], "/") . '/CreateOrder', [
-            'headers' => [
-                'Content-Type' => 'application/json'
-            ],
+                'headers' => [
+                    'Content-Type' => 'application/json'
+                ],
                 'body' => json_encode($param),
             ]);
         } catch (GuzzleException $e) {
-            throw new JSONException("网关连接失败，下单未成功");
+            throw new JSONException("网关连接失败，下单未成功：" . $e->getMessage());
         }
 
         $contents = $request->getBody()->getContents();
         $json = (array)json_decode((string)$contents, true);
+        
         if (!isset($json['success']) || !$json['success']) {
-            throw new JSONException("支付网关异常". $json['message']);
+            $errorMsg = isset($json['message']) ? $json['message'] : '未知错误';
+            throw new JSONException("支付网关异常：" . $errorMsg);
         }
 
         $payEntity = new PayEntity();
